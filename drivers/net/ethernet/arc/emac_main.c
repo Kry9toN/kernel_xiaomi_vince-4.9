@@ -692,8 +692,8 @@ static void arc_emac_set_address_internal(struct net_device *ndev)
 	struct arc_emac_priv *priv = netdev_priv(ndev);
 	unsigned int addr_low, addr_hi;
 
-	addr_low = le32_to_cpu(*(__le32 *)&ndev->dev_addr[0]);
-	addr_hi = le16_to_cpu(*(__le16 *)&ndev->dev_addr[4]);
+	addr_low = le32_to_cpu(*(__le32 *) &ndev->dev_addr[0]);
+	addr_hi = le16_to_cpu(*(__le16 *) &ndev->dev_addr[4]);
 
 	arc_reg_set(priv, R_ADDRL, addr_low);
 	arc_reg_set(priv, R_ADDRH, addr_hi);
@@ -839,7 +839,7 @@ int arc_emac_probe(struct net_device *ndev, int interface)
 		eth_hw_addr_random(ndev);
 
 	arc_emac_set_address_internal(ndev);
-	dev_info(dev, "MAC address is now %pM\n", ndev->dev_addr);
+	dev_info(&pdev->dev, "MAC address is now %pM\n", ndev->dev_addr);
 
 	/* Do 1 allocation instead of 2 separate ones for Rx and Tx BD rings */
 	priv->rxbd = dmam_alloc_coherent(dev, RX_RING_SZ + TX_RING_SZ,
