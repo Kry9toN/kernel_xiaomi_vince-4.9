@@ -911,6 +911,11 @@ config MSM_BAM_DMUX
 		the regulator specific to RSB. Sends the side band events generated
 		by BG to input framework.
 
+config STATE_NOTIFIER
+	bool "State Notifier"
+
+source "drivers/soc/qcom/memshare/Kconfig"
+
 	config MSM_PIL_SSR_BG
 	tristate "MSM Subsystem Blackghost(BG) Support"
 	depends on MSM_PIL && MSM_SUBSYSTEM_RESTART
