@@ -344,6 +344,10 @@ static int f2fs_link(struct dentry *old_dentry, struct inode *dir,
 	if (err)
 		return err;
 
+	if (f2fs_encrypted_inode(dir) &&
+			!fscrypt_has_permitted_context(dir, inode))
+		return -EXDEV;
+
 	f2fs_balance_fs(sbi, true);
 
 	inode->i_ctime = current_time(inode);
@@ -855,9 +859,14 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		return -EXDEV;
 
 	err = dquot_initialize(old_dir);
+	if ((old_dir != new_dir) && f2fs_encrypted_inode(new_dir) &&
+			!fscrypt_has_permitted_context(new_dir, old_inode)) {
+		err = -EXDEV;
+		goto out;
+	}
+
 	if (err)
 		goto out;
-
 	err = dquot_initialize(new_dir);
 	if (err)
 		goto out;
@@ -1059,6 +1068,12 @@ static int f2fs_cross_rename(struct inode *old_dir, struct dentry *old_dentry,
 	err = dquot_initialize(new_dir);
 	if (err)
 		goto out;
+
+	if ((f2fs_encrypted_inode(old_dir) || f2fs_encrypted_inode(new_dir)) &&
+			(old_dir != new_dir) &&
+			(!fscrypt_has_permitted_context(new_dir, old_inode) ||
+			 !fscrypt_has_permitted_context(old_dir, new_inode)))
+		return -EXDEV;
 
 	err = -ENOENT;
 	old_entry = f2fs_find_entry(old_dir, &old_dentry->d_name, &old_page);
