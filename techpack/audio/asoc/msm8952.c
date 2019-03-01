@@ -73,6 +73,9 @@ static int msm8952_mclk_event(struct snd_soc_dapm_widget *w,
 static int msm8952_wsa_switch_event(struct snd_soc_dapm_widget *w,
 			      struct snd_kcontrol *kcontrol, int event);
 
+int ext_pa_gpio = 0;
+int ext_pa_status = 0;
+
 /*
  * Android L spec
  * Need to report LINEIN
@@ -331,6 +334,7 @@ int is_ext_spk_gpio_support(struct platform_device *pdev,
 				__func__, pdata->spk_ext_pa_gpio);
 			return -EINVAL;
 		}
+		ext_pa_gpio = pdata->spk_ext_pa_gpio;
 	}
 	return 0;
 }
@@ -347,6 +351,7 @@ static int enable_spk_ext_pa(struct snd_soc_codec *codec, int enable)
 		return false;
 	}
 
+	ext_pa_status = enable;
 	pr_debug("%s: %s external speaker PA\n", __func__,
 		enable ? "Enable" : "Disable");
 
