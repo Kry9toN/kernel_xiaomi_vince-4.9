@@ -59,3 +59,9 @@ obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal.o
 obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= thermal-generic-adc.o
 obj-$(CONFIG_THERMAL_QPNP_ADC_TM)	+= qpnp-adc-tm.o
 obj-$(CONFIG_THERMAL_TSENS)	+= msm-tsens.o tsens2xxx.o tsens-dbg.o tsens-mtc.o tsens1xxx.o tsens_calib.o
+CFLAGS_msm_thermal.o += $(call cc-disable-warning,strlcpy-strlcat-size)
+#TODO: remove me b/62058353
+subdir-ccflags-y += \
+	-Wno-parentheses-equality \
+	-Wno-enum-conversion
+obj-$(CONFIG_MSM_THERMAL_SIMPLE) += msm_thermal_simple.o
