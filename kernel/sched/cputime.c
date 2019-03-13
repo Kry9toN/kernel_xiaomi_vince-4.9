@@ -42,8 +42,7 @@ static void irqtime_account_delta(struct irqtime *irqtime, u64 delta,
 				  enum cpu_usage_stat idx)
 {
 	u64 *cpustat = kcpustat_this_cpu->cpustat;
-
-	u64_stats_update_begin(&irqtime->sync);
+ 	u64_stats_update_begin(&irqtime->sync);
 	cpustat[idx] += delta;
 	irqtime->total += delta;
 	irqtime->tick_delta += delta;
