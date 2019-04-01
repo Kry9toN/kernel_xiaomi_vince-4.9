@@ -761,6 +761,15 @@ else
 EXTRA_CFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-switch-unreachable
 endif
 
+# Supress clang warning
+subdir-ccflags-y += \
+	-Wno-array-bounds \
+	-Wno-empty-body \
+	-Wno-enum-conversion \
+	-Wno-non-literal-null-conversion \
+	-Wno-parentheses-equality \
+	-Wno-typedef-redefinition
+
 ifeq ($(CONFIG_WLAN_OFFLOAD_PACKETS),y)
 CDEFINES += -DWLAN_FEATURE_OFFLOAD_PACKETS
 endif
