@@ -1088,5 +1088,12 @@ config REGULATOR_STUB
 	  Clients can use the real regulator device names with proper
 	  constraint checking while the real driver is being developed.
 
+config VOLTAGE_CONTROL
+	bool "Enable CPU voltage control"
+	depends on REGULATOR_CPR3
+	default n
+	help
+	  Enable CPU voltage control for MSM8996.
+
 endif
 
