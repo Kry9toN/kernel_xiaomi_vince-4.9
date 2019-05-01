@@ -1144,6 +1144,16 @@ static void sdhci_finish_data(struct sdhci_host *host)
 	host->data = NULL;
 	host->data_cmd = NULL;
 
+	/*
+	 * The controller needs a reset of internal state machines upon error
+	 * conditions.
+	 */
+	if (data->error) {
+		if (!host->cmd || host->cmd == data_cmd)
+			sdhci_do_reset(host, SDHCI_RESET_CMD);
+		sdhci_do_reset(host, SDHCI_RESET_DATA);
+	}
+
 	MMC_TRACE(host->mmc, "%s: 0x24=0x%08x\n", __func__,
 		sdhci_readl(host, SDHCI_PRESENT_STATE));
 	if ((host->flags & (SDHCI_REQ_USE_DMA | SDHCI_USE_ADMA)) ==
@@ -3024,23 +3034,7 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask, u32 *intmask_p)
 				host->cmd->error = -EILSEQ;
 		}
 
-<<<<<<< HEAD
-		/*
-		 * If this command initiates a data phase and a response
-		 * CRC error is signalled, the card can start transferring
-		 * data - the card may have received the command without
-		 * error.  We must not terminate the mmc_request early.
-		 *
-		 * If the card did not receive the command or returned an
-		 * error which prevented it sending data, the data phase
-		 * will time out.
-		 *
-		 * Even in case of cmd INDEX OR ENDBIT error we
-		 * handle it the same way.
-		 */
-=======
 		/* Treat data command CRC error the same as data CRC error */
->>>>>>> v4.9.171
 		if (host->cmd->data &&
 		    (((intmask & (SDHCI_INT_CRC | SDHCI_INT_TIMEOUT)) ==
 		     SDHCI_INT_CRC) || (host->cmd->error == -EILSEQ))) {
@@ -3424,17 +3418,12 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 			result = IRQ_WAKE_THREAD;
 		}
 
-<<<<<<< HEAD
 		if (intmask & SDHCI_INT_CMD_MASK) {
 			if ((host->quirks2 & SDHCI_QUIRK2_SLOW_INT_CLR) &&
 				(host->clock <= 400000))
 				udelay(40);
-			sdhci_cmd_irq(host, intmask & SDHCI_INT_CMD_MASK);
-		}
-=======
-		if (intmask & SDHCI_INT_CMD_MASK)
 			sdhci_cmd_irq(host, intmask & SDHCI_INT_CMD_MASK, &intmask);
->>>>>>> v4.9.171
+		}
 
 		if (intmask & SDHCI_INT_DATA_MASK) {
 			if ((host->quirks2 & SDHCI_QUIRK2_SLOW_INT_CLR) &&
