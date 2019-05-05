@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-/* msm-audio */
 &soc {
 	int_codec: sound {
 		status = "ok";
@@ -27,7 +25,6 @@
 			"AMIC1", "MIC BIAS External",
 			"AMIC2", "MIC BIAS Internal2",
 			"AMIC3", "MIC BIAS External";
-		/delete-property/qcom,hdmi-dba-codec-rx;
 	};
 	i2c@78b6000 {
 		status = "okay";
@@ -45,7 +42,6 @@
 	};
 };
 
-/* msm8953-audio */
 &int_codec {
 	qcom,msm-mbhc-hphl-swh = <1>;
 	qcom,msm-mbhc-gnd-swh = <1>;
@@ -54,4 +50,5 @@
 	/delete-property/msm-vdd-wsa-switch-supply;
 	/delete-property/qcom,msm-vdd-wsa-switch-voltage;
 	/delete-property/qcom,msm-vdd-wsa-switch-current;
+	/delete-property/qcom,hdmi-dba-codec-rx;
 };

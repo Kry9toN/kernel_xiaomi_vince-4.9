@@ -12,7 +12,6 @@
  * GNU General Public License for more details.
  */
 
-/* msm8953-camera-sensor-qrd */
 &soc {
        led_flash0: qcom,camera-flash {
                 cell-index = <0>;
