@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-/* msm8953 */
 / {
 	firmware: firmware {
 		android {
@@ -23,16 +21,17 @@
                                 	dev = "/dev/block/platform/soc/7824900.sdhci/by-name/system";
                                 	type = "ext4";
                                 	mnt_flags = "ro,barrier=1,discard";
-                                	fsmgr_flags = "wait";
+                                	fsmgr_flags = "wait,verify";
                                 	status = "ok";
                                 };
                         	vendor {
                                 	dev = "/dev/block/platform/soc/7824900.sdhci/by-name/cust";
-                                	fsmgr_flags = "wait";
+                                	fsmgr_flags = "wait,verify";
                                 };
                         };
                 };
-	};
+        };
+
 	reserved-memory {
 		other_ext_mem: other_ext_region@0 {
 			reg = <0x0 0x84A00000 0x0 0x1E00000>;
@@ -42,6 +41,9 @@
 		};
 		wcnss_fw_mem: wcnss_fw_region@0 {
 			reg = <0x0 0x8e800000 0x0 0x700000>;
+		};
+		secure_mem: secure_region@0 {
+			size = <0 0x09800000>;
 		};
 		pstore_reserve_mem: pstore_reserve_mem_region@0 {
 			compatible = "removed-dma-pool";
@@ -79,6 +81,15 @@
 		qcom,bam-producer-pipe-index = <7>;
 		qcom,master-id = <84>;
 	};
+
+	qcom,msm-imem@8600000 {
+		/delete-node/ dload_type@1c;
+		dload_type@18 {
+			compatible = "qcom,msm-imem-dload-type";
+			reg = <0x18 4>;
+		};
+	};
+
 	sn_fuse: snfuse@0xa4128 {
 		compatible = "qcom,sn-fuse";
 		reg = <0xa4128 0x4>;
@@ -114,8 +125,11 @@
 				"iface_clk", "bus_clk";
 		qcom,ce-opp-freq = <100000000>;
 	};
+	sdhc_1: sdhci@7824900 {
+		reg = <0x7824900 0x500>, <0x7824000 0x800>, <0x7824e00 0x200>;
+		reg-names = "hc_mem", "core_mem", "cmdq_mem";
+	};
 	usb3: ssusb@7000000{
-		qcom,usbin-vadc = <&pmi8950_vadc>;
 		qcom,detect-dpdm-floating;
 	};
 	qusb_phy: qusb@79000 {
