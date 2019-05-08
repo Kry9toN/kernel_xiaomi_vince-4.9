@@ -7,8 +7,6 @@ agent:
 blocks:
   - name: "Build"
     task:
-      secrets:
-      - name: KryptonKernel
       jobs:
       - name: Compile Kernel
         commands:
