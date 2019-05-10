@@ -13,5 +13,5 @@ blocks:
           - checkout
           - install-package bc build-essential zip curl libstdc++6
           - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/semaphore49
-          - bash semaphore
+          - bash semaphore49
 
