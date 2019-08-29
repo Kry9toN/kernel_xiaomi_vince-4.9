@@ -52,7 +52,7 @@
 					dev = "/dev/block/platform/soc/7824900.sdhci/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait";
+					fsmgr_flags = "wait,avb";
 					status = "ok";
 				};
 
@@ -879,16 +879,13 @@
 		qcom,gcc_oxili_gfx3d_clk-opp-handle = <&msm_gpu>;
 		qcom,gfxfreq-corner =
 			 <         0   0 >,
-			 <  80000000   1 >,
-			 < 133330000   2 >,  /* Min SVS   */
-			 < 216000000   3 >,  /* Low SVS   */
-			 < 320000000   4 >,  /* SVS       */
-			 < 400000000   5 >,  /* SVS Plus  */
-			 < 510000000   6 >,  /* NOM       */
-			 < 560000000   7 >,  /* Nom Plus  */
-			 < 650000000   8 >,  /* Turbo     */
-			 < 700000000   9 >,
-			 < 725000000   10 >;
+			 < 133330000   1 >,  /* Min SVS   */
+			 < 216000000   2 >,  /* Low SVS   */
+			 < 320000000   3 >,  /* SVS       */
+			 < 400000000   4 >,  /* SVS Plus  */
+			 < 510000000   5 >,  /* NOM       */
+			 < 560000000   6 >,  /* Nom Plus  */
+			 < 650000000   7 >;  /* Turbo     */
 		#clock-cells = <1>;
 	};
 
