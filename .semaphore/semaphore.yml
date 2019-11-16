@@ -3,7 +3,9 @@ name: HackKernel
 agent:
   machine:
     type: e1-standard-2
-    os_image: ubuntu1804
+  containers:
+  - name: Masak
+    image: najahi/oven:latest
 blocks:
   - name: "Build"
     task:
@@ -11,7 +13,6 @@ blocks:
       - name: Compile Kernel
         commands:
           - checkout
-          - install-package bc build-essential zip curl libstdc++6
           - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/semaphore49
           - bash semaphore49
 
