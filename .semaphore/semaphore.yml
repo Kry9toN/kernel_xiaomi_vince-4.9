@@ -3,6 +3,8 @@ name: HackKernel
 agent:
   machine:
     type: e1-standard-2
+  containers:
+  - name: Masak
     image: najahi/oven:latest
 blocks:
   - name: "Build"
@@ -13,4 +15,3 @@ blocks:
           - checkout
           - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/semaphore49
           - bash semaphore49
-
