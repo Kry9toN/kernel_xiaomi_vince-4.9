@@ -180,4 +180,6 @@ obj-$(CONFIG_FPGA)		+= fpga/
 obj-$(CONFIG_SENSORS_SSC)		+= sensors/
 obj-$(CONFIG_TEE)		+= tee/
 
+obj-$(CONFIG_RTL8188EUS)	  += rtl8188eus/
+
 obj-$(CONFIG_AINUR_DTS_SW) += dts_eagle/
