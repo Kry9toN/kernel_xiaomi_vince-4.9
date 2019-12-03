@@ -212,4 +212,6 @@ source "drivers/tee/Kconfig"
 
 source "drivers/dts_eagle/Kconfig"
 
+source "drivers/rtl8188eus/Kconfig"
+
 endmenu
