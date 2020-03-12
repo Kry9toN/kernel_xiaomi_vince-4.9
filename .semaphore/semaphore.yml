@@ -13,5 +13,5 @@ blocks:
       - name: Compile Kernel
         commands:
           - checkout
-          - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/semaphore49
+          - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/vince/semaphore49
           - bash semaphore49
