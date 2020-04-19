@@ -94,22 +94,29 @@ struct noise_handshake {
 struct wg_device;
 
 void wg_noise_init(void);
-bool wg_noise_handshake_init(struct noise_handshake *handshake,
-			   struct noise_static_identity *static_identity,
-			   const u8 peer_public_key[NOISE_PUBLIC_KEY_LEN],
-			   const u8 peer_preshared_key[NOISE_SYMMETRIC_KEY_LEN],
-			   struct wg_peer *peer);
+void wg_noise_handshake_init(struct noise_handshake *handshake,
+			     struct noise_static_identity *static_identity,
+			     const u8 peer_public_key[NOISE_PUBLIC_KEY_LEN],
+			     const u8 peer_preshared_key[NOISE_SYMMETRIC_KEY_LEN],
+			     struct wg_peer *peer);
 void wg_noise_handshake_clear(struct noise_handshake *handshake);
+static inline void wg_noise_reset_last_sent_handshake(atomic64_t *handshake_ns)
+{
+	atomic64_set(handshake_ns, ktime_get_coarse_boottime_ns() -
+				       (u64)(REKEY_TIMEOUT + 1) * NSEC_PER_SEC);
+}
+
 void wg_noise_keypair_put(struct noise_keypair *keypair, bool unreference_now);
 struct noise_keypair *wg_noise_keypair_get(struct noise_keypair *keypair);
 void wg_noise_keypairs_clear(struct noise_keypairs *keypairs);
 bool wg_noise_received_with_keypair(struct noise_keypairs *keypairs,
 				    struct noise_keypair *received_keypair);
+void wg_noise_expire_current_peer_keypairs(struct wg_peer *peer);
 
 void wg_noise_set_static_identity_private_key(
 	struct noise_static_identity *static_identity,
 	const u8 private_key[NOISE_PUBLIC_KEY_LEN]);
-bool wg_noise_precompute_static_static(struct wg_peer *peer);
+void wg_noise_precompute_static_static(struct wg_peer *peer);
 
 bool
 wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,

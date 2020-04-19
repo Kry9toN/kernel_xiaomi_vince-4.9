@@ -24,6 +24,7 @@
 set -e
 
 exec 3>&1
+export LANG=C
 export WG_HIDE_KEYS=never
 netns0="wg-test-$$-0"
 netns1="wg-test-$$-1"
@@ -37,10 +38,9 @@ n2() { pretty 2 "$*"; maybe_exec ip netns exec $netns2 "$@"; }
 ip0() { pretty 0 "ip $*"; ip -n $netns0 "$@"; }
 ip1() { pretty 1 "ip $*"; ip -n $netns1 "$@"; }
 ip2() { pretty 2 "ip $*"; ip -n $netns2 "$@"; }
-sleep() { read -t "$1" -N 0 || true; }
-waitiperf() { pretty "${1//*-}" "wait for iperf:5201"; while [[ $(ss -N "$1" -tlp 'sport = 5201') != *iperf3* ]]; do sleep 0.1; done; }
-waitncatudp() { pretty "${1//*-}" "wait for udp:1111"; while [[ $(ss -N "$1" -ulp 'sport = 1111') != *ncat* ]]; do sleep 0.1; done; }
-waitncattcp() { pretty "${1//*-}" "wait for tcp:1111"; while [[ $(ss -N "$1" -tlp 'sport = 1111') != *ncat* ]]; do sleep 0.1; done; }
+sleep() { read -t "$1" -N 1 || true; }
+waitiperf() { pretty "${1//*-}" "wait for iperf:5201 pid $2"; while [[ $(ss -N "$1" -tlpH 'sport = 5201') != *\"iperf3\",pid=$2,fd=* ]]; do sleep 0.1; done; }
+waitncatudp() { pretty "${1//*-}" "wait for udp:1111 pid $2"; while [[ $(ss -N "$1" -ulpH 'sport = 1111') != *\"ncat\",pid=$2,fd=* ]]; do sleep 0.1; done; }
 waitiface() { pretty "${1//*-}" "wait for $2 to come up"; ip netns exec "$1" bash -c "while [[ \$(< \"/sys/class/net/$2/operstate\") != up ]]; do read -t .1 -N 0 || true; done;"; }
 
 cleanup() {
@@ -76,8 +76,10 @@ ip0 link add dev wg0 type wireguard
 ip0 link set wg0 netns $netns2
 key1="$(pp wg genkey)"
 key2="$(pp wg genkey)"
+key3="$(pp wg genkey)"
 pub1="$(pp wg pubkey <<<"$key1")"
 pub2="$(pp wg pubkey <<<"$key2")"
+pub3="$(pp wg pubkey <<<"$key3")"
 psk="$(pp wg genpsk)"
 [[ -n $key1 && -n $key2 && -n $psk ]]
 
@@ -117,22 +119,22 @@ tests() {
 
 	# TCP over IPv4
 	n2 iperf3 -s -1 -B 192.168.241.2 &
-	waitiperf $netns2
+	waitiperf $netns2 $!
 	n1 iperf3 -Z -t 3 -c 192.168.241.2
 
 	# TCP over IPv6
 	n1 iperf3 -s -1 -B fd00::1 &
-	waitiperf $netns1
+	waitiperf $netns1 $!
 	n2 iperf3 -Z -t 3 -c fd00::1
 
 	# UDP over IPv4
 	n1 iperf3 -s -1 -B 192.168.241.1 &
-	waitiperf $netns1
+	waitiperf $netns1 $!
 	n2 iperf3 -Z -t 3 -b 0 -u -c 192.168.241.1
 
 	# UDP over IPv6
 	n2 iperf3 -s -1 -B fd00::2 &
-	waitiperf $netns2
+	waitiperf $netns2 $!
 	n1 iperf3 -Z -t 3 -b 0 -u -c fd00::2
 }
 
@@ -205,7 +207,7 @@ n1 ping -W 1 -c 1 192.168.241.2
 n1 wg set wg0 peer "$pub2" allowed-ips 192.168.241.0/24
 exec 4< <(n1 ncat -l -u -p 1111)
 ncat_pid=$!
-waitncatudp $netns1
+waitncatudp $netns1 $ncat_pid
 n2 ncat -u 192.168.241.1 1111 <<<"X"
 read -r -N 1 -t 1 out <&4 && [[ $out == "X" ]]
 kill $ncat_pid
@@ -214,12 +216,20 @@ n1 wg set wg0 peer "$more_specific_key" allowed-ips 192.168.241.2/32
 n2 wg set wg0 listen-port 9997
 exec 4< <(n1 ncat -l -u -p 1111)
 ncat_pid=$!
-waitncatudp $netns1
+waitncatudp $netns1 $ncat_pid
 n2 ncat -u 192.168.241.1 1111 <<<"X"
 ! read -r -N 1 -t 1 out <&4 || false
 kill $ncat_pid
 n1 wg set wg0 peer "$more_specific_key" remove
 [[ $(n1 wg show wg0 endpoints) == "$pub2	[::1]:9997" ]]
+
+# Test that we can change private keys keys and immediately handshake
+n1 wg set wg0 private-key <(echo "$key1") peer "$pub2" preshared-key <(echo "$psk") allowed-ips 192.168.241.2/32 endpoint 127.0.0.1:2
+n2 wg set wg0 private-key <(echo "$key2") listen-port 2 peer "$pub1" preshared-key <(echo "$psk") allowed-ips 192.168.241.1/32
+n1 ping -W 1 -c 1 192.168.241.2
+n1 wg set wg0 private-key <(echo "$key3")
+n2 wg set wg0 peer "$pub3" preshared-key <(echo "$psk") allowed-ips 192.168.241.1/32 peer "$pub1" remove
+n1 ping -W 1 -c 1 192.168.241.2
 
 ip1 link del wg0
 ip2 link del wg0
@@ -231,7 +241,7 @@ ip2 link del wg0
 # │  ┌─────┐             ┌─────┐           │    │    ┌──────┐              ┌──────┐              │     │  ┌─────┐            ┌─────┐            │
 # │  │ wg0 │─────────────│vethc│───────────┼────┼────│vethrc│              │vethrs│──────────────┼─────┼──│veths│────────────│ wg0 │            │
 # │  ├─────┴──────────┐  ├─────┴──────────┐│    │    ├──────┴─────────┐    ├──────┴────────────┐ │     │  ├─────┴──────────┐ ├─────┴──────────┐ │
-# │  │192.168.241.1/24│  │192.168.1.100/24││    │    │192.168.1.100/24│    │10.0.0.1/24        │ │     │  │10.0.0.100/24   │ │192.168.241.2/24│ │
+# │  │192.168.241.1/24│  │192.168.1.100/24││    │    │192.168.1.1/24  │    │10.0.0.1/24        │ │     │  │10.0.0.100/24   │ │192.168.241.2/24│ │
 # │  │fd00::1/24      │  │                ││    │    │                │    │SNAT:192.168.1.0/24│ │     │  │                │ │fd00::2/24      │ │
 # │  └────────────────┘  └────────────────┘│    │    └────────────────┘    └───────────────────┘ │     │  └────────────────┘ └────────────────┘ │
 # └────────────────────────────────────────┘    └────────────────────────────────────────────────┘     └────────────────────────────────────────┘
@@ -270,8 +280,38 @@ n2 ping -W 1 -c 1 192.168.241.1
 # Demonstrate n2 can still send packets to n1, since persistent-keepalive will prevent connection tracking entry from expiring (to see entries: `n0 conntrack -L`).
 pp sleep 3
 n2 ping -W 1 -c 1 192.168.241.1
+n1 wg set wg0 peer "$pub2" persistent-keepalive 0
+
+# Do a wg-quick(8)-style policy routing for the default route, making sure vethc has a v6 address to tease out bugs.
+ip1 -6 addr add fc00::9/96 dev vethc
+ip1 -6 route add default via fc00::1
+ip2 -4 addr add 192.168.99.7/32 dev wg0
+ip2 -6 addr add abab::1111/128 dev wg0
+n1 wg set wg0 fwmark 51820 peer "$pub2" allowed-ips 192.168.99.7,abab::1111
+ip1 -6 route add default dev wg0 table 51820
+ip1 -6 rule add not fwmark 51820 table 51820
+ip1 -6 rule add table main suppress_prefixlength 0
+ip1 -4 route add default dev wg0 table 51820
+ip1 -4 rule add not fwmark 51820 table 51820
+ip1 -4 rule add table main suppress_prefixlength 0
+# suppress_prefixlength only got added in 3.12, and we want to support 3.10+.
+if [[ $(ip1 -4 rule show all) == *suppress_prefixlength* ]]; then
+	# Flood the pings instead of sending just one, to trigger routing table reference counting bugs.
+	n1 ping -W 1 -c 100 -f 192.168.99.7
+	n1 ping -W 1 -c 100 -f abab::1111
+fi
+
+# Have ns2 NAT into wg0 packets from ns0, but return an icmp error along the right route.
+n2 iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -d 192.168.241.0/24 -j SNAT --to 192.168.241.2
+n0 iptables -t filter -A INPUT \! -s 10.0.0.0/24 -i vethrs -j DROP # Manual rpfilter just to be explicit.
+n2 bash -c 'printf 1 > /proc/sys/net/ipv4/ip_forward'
+ip0 -4 route add 192.168.241.1 via 10.0.0.100
+n2 wg set wg0 peer "$pub1" remove
+[[ $(! n0 ping -W 1 -c 1 192.168.241.1 || false) == *"From 10.0.0.100 icmp_seq=1 Destination Host Unreachable"* ]]
 
 n0 iptables -t nat -F
+n0 iptables -t filter -F
+n2 iptables -t nat -F
 ip0 link del vethrc
 ip0 link del vethrs
 ip1 link del wg0
@@ -489,6 +529,17 @@ n0 wg set wg0 peer "$pub2" allowed-ips 0.0.0.0/0,10.0.0.0/8,100.0.0.0/10,172.16.
 n0 wg set wg0 peer "$pub2" allowed-ips 0.0.0.0/0
 n0 wg set wg0 peer "$pub2" allowed-ips ::/0,1700::/111,5000::/4,e000::/37,9000::/75
 n0 wg set wg0 peer "$pub2" allowed-ips ::/0
+n0 wg set wg0 peer "$pub2" remove
+for low_order_point in AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= 4Ot6fDtBuK4WVuP68Z/EatoJjeucMrH9hmIFFl9JuAA= X5yVvKNQjCSx0LFVnIPvWwREXMRYHI6G2CJO3dCfEVc= 7P///////////////////////////////////////38= 7f///////////////////////////////////////38= 7v///////////////////////////////////////38=; do
+	n0 wg set wg0 peer "$low_order_point" persistent-keepalive 1 endpoint 127.0.0.1:1111
+done
+[[ -n $(n0 wg show wg0 peers) ]]
+exec 4< <(n0 ncat -l -u -p 1111)
+ncat_pid=$!
+waitncatudp $netns0 $ncat_pid
+ip0 link set wg0 up
+! read -r -n 1 -t 2 <&4 || false
+kill $ncat_pid
 ip0 link del wg0
 
 declare -A objects
