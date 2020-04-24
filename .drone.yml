@@ -1,0 +1,13 @@
+kind: pipeline
+type: docker
+name: build
+
+steps:
+- name: cooked
+  image: najahi/oven:latest
+  environment:
+    token:
+      from_secret: bot_api
+  commands:
+  - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/vince/drone49
+  - bash drone49
