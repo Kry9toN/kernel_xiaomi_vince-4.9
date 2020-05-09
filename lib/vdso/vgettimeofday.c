@@ -417,11 +417,11 @@ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
 	case CLOCK_MONOTONIC_RAW:
 	case CLOCK_BOOTTIME:
 		nsec = MONOTONIC_RES_NSEC;
-	else if (clock == CLOCK_REALTIME_COARSE ||
-		 clock == CLOCK_MONOTONIC_COARSE)
-		nsec = LOW_RES_NSEC;
-	else
+		break;
+#endif
+	default:
 		return clock_getres_fallback(clock, res);
+	}
 
 	if (likely(res != NULL)) {
 		res->tv_sec = 0;
