@@ -41,9 +41,9 @@
 		qcom,gpu-pwrlevel@0 {
 			reg = <0>;
 			qcom,gpu-freq = <725000000>;
-			qcom,bus-freq = <10>;
+			qcom,bus-freq = <11>;
 			qcom,bus-min = <10>;
-			qcom,bus-max = <10>;
+			qcom,bus-max = <11>;
 		};
 
 		/* TURBO LD0 */
