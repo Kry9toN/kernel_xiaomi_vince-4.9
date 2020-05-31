@@ -21,8 +21,8 @@
 		 < 510000000   5 >,  /* NOM       */
 		 < 560000000   6 >,  /* Nom Plus  */
 		 < 650000000   7 >,  /* Turbo     */
-		 < 700000000   7 >,  /* Turbo     */
-		 < 725000000   7 >;  /* Turbo     */
+		 < 700000000   8 >,  /* Turbo     */
+		 < 780000000   9 >;  /* Turbo     */
 };
 
 &msm_gpu {
@@ -40,7 +40,7 @@
 		/* TURBO LD1 */
 		qcom,gpu-pwrlevel@0 {
 			reg = <0>;
-			qcom,gpu-freq = <725000000>;
+			qcom,gpu-freq = <780000000>;
 			qcom,bus-freq = <11>;
 			qcom,bus-min = <10>;
 			qcom,bus-max = <11>;
