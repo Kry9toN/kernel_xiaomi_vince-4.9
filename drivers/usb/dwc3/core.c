@@ -1323,22 +1323,22 @@ static int dwc3_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(dwc->dev, "failed to allocate event buffers\n");
 		ret = -ENOMEM;
-		goto err2;
+		goto err0;
 	}
 
 	ret = dwc3_get_dr_mode(dwc);
 	if (ret)
-		goto err3;
+		goto err0;
 
 	ret = dwc3_alloc_scratch_buffers(dwc);
 	if (ret)
-		goto err3;
+		goto err0;
 
 	ret = dwc3_core_init(dwc);
 	if (ret) {
 		if (ret != -EPROBE_DEFER)
 			dev_err(dev, "failed to initialize core: %d\n", ret);
-		goto err4;
+		goto err0;
 	}
 
 	/* Check the maximum_speed parameter */

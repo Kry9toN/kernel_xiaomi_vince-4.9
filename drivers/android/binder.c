@@ -1183,19 +1183,11 @@ static void binder_do_set_priority(struct task_struct *task,
 	if (verify && is_rt_policy(policy) && !has_cap_nice) {
 		long max_rtprio = task_rlimit(task, RLIMIT_RTPRIO);
 
-	if (mm) {
-		down_write(&mm->mmap_sem);
-		if (!mmget_still_valid(mm)) {
-			if (allocate == 0)
-				goto free_range;
-			goto err_no_vma;
-		}
-
-		vma = proc->vma;
-		if (vma && mm != proc->vma_vm_mm) {
-			pr_err("%d: vma mm and task mm mismatch\n",
-				proc->pid);
-			vma = NULL;
+                if (max_rtprio == 0) {
+			policy = SCHED_NORMAL;
+			priority = MIN_NICE;
+		} else if (priority > max_rtprio) {
+			priority = max_rtprio;
 		}
 	}
 
@@ -4644,8 +4636,7 @@ static unsigned int binder_poll(struct file *filp,
 
 	thread->looper |= BINDER_LOOPER_STATE_POLL;
 
-	wait_for_proc_work = thread->transaction_stack == NULL &&
-		list_empty(&thread->todo) && thread->return_error == BR_OK;
+	wait_for_proc_work = binder_available_for_proc_work_ilocked(thread);
 
 	binder_inner_proc_unlock(thread->proc);
 
