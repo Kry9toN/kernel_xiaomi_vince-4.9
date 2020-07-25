@@ -40,6 +40,8 @@
 #include <asm/vdso.h>
 #include <asm/vdso_datapage.h>
 
+extern char vdso_start[], vdso_end[];
+static unsigned long vdso_pages __ro_after_init;
 #ifdef USE_SYSCALL
 #if defined(__LP64__)
 static int enable_64 = 1;
@@ -186,14 +188,14 @@ static int __init vdso_mappings_init(const char *name,
 	struct page **vdso_pagelist;
 	unsigned long pfn;
 
-	if (memcmp(code_start, "\177ELF", 4)) {
-		pr_err("%sis not a valid ELF object!\n", name);
+	if (memcmp(vdso_start, "\177ELF", 4)) {
+		pr_err("vDSO is not a valid ELF object!\n");
 		return -EINVAL;
 	}
 
-	vdso_pages = (code_end - code_start) >> PAGE_SHIFT;
-	pr_info("%s: %ld pages (%ld code @ %p, %ld data @ %p)\n",
-		name, vdso_pages + 1, vdso_pages, code_start, 1L, vdso_data);
+	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
+	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
+		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
 
 	/* Allocate the vDSO pagelist, plus a page for the data. */
 	/*
@@ -214,7 +216,7 @@ static int __init vdso_mappings_init(const char *name,
 	pfn = sym_to_pfn(code_start);
 
 	for (i = 0; i < vdso_pages; i++)
-		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
+		vdso_pagelist[i + 1] = pfn_to_page(PHYS_PFN(__pa(vdso_start)) + i);
 
 	/* Populate the special mapping structures */
 	mappings->data_mapping = (struct vm_special_mapping) {

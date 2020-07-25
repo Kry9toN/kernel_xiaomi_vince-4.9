@@ -167,6 +167,8 @@ static int __init of_free_phandle_cache(void)
 {
 	unsigned long flags;
 
+        if (!of_kset)
+               return 0;
 	raw_spin_lock_irqsave(&devtree_lock, flags);
 
 	kfree(phandle_cache);
