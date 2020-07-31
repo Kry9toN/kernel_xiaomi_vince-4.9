@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -305,6 +305,8 @@ struct fastrpc_channel_ctx {
 	struct fastrpc_glink_info link;
 	/* Indicates, if channel is restricted to secure node only */
 	int secure;
+	int memshareenabled;
+	struct smq_phy_page memsharerange;
 };
 
 struct fastrpc_apps {
@@ -321,6 +323,7 @@ struct fastrpc_apps {
 	spinlock_t hlock;
 	struct ion_client *client;
 	struct device *dev;
+	struct device *mdev;
 	unsigned int latency;
 	bool glink;
 	bool legacy;
@@ -717,12 +720,23 @@ static void fastrpc_mmap_free(struct fastrpc_mmap *map, uint32_t flags)
 {
 	struct fastrpc_apps *me = &gfa;
 	struct fastrpc_file *fl;
-	int vmid;
+	int vmid, cid = -1, err = 0;
 	struct fastrpc_session_ctx *sess;
 
 	if (!map)
 		return;
 	fl = map->fl;
+	if (fl && !(map->flags == ADSP_MMAP_HEAP_ADDR ||
+				map->flags == ADSP_MMAP_REMOTE_HEAP_ADDR)) {
+		cid = fl->cid;
+		VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
+		if (err) {
+			err = -ECHRNG;
+			pr_err("adsprpc: ERROR:%s, Invalid channel id: %d, err:%d",
+				__func__, cid, err);
+			return;
+		}
+	}
 	if (map->flags == ADSP_MMAP_HEAP_ADDR ||
 				map->flags == ADSP_MMAP_REMOTE_HEAP_ADDR) {
 		spin_lock(&me->hlock);
@@ -803,15 +817,21 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd,
 	struct fastrpc_apps *me = &gfa;
 	struct fastrpc_session_ctx *sess;
 	struct fastrpc_apps *apps = fl->apps;
-	int cid = fl->cid;
-	struct fastrpc_channel_ctx *chan = &apps->channel[cid];
 	struct fastrpc_mmap *map = NULL;
+	struct fastrpc_channel_ctx *chan = NULL;
 	unsigned long attrs;
 	dma_addr_t region_phys = 0;
 	void *region_vaddr = NULL;
 	unsigned long flags;
-	int err = 0, vmid;
+	int err = 0, vmid, cid = -1;
 
+	cid = fl->cid;
+	VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
+	if (err) {
+		err = -ECHRNG;
+		goto bail;
+	}
+	chan = &apps->channel[cid];
 	if (!fastrpc_mmap_find(fl, fd, va, len, mflags, 1, ppmap))
 		return 0;
 	map = kzalloc(sizeof(*map), GFP_KERNEL);
@@ -937,9 +957,17 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd,
 
 		vmid = fl->apps->channel[fl->cid].vmid;
 		if (!sess->smmu.enabled && !vmid) {
-			VERIFY(err, map->phys >= me->range.addr &&
-			map->phys + map->size <=
-			me->range.addr + me->range.size);
+			if (fl->apps->channel[cid].memshareenabled == 2) {
+				VERIFY(err, map->phys >=
+				fl->apps->channel[cid].memsharerange.addr &&
+				map->phys + map->size <=
+				fl->apps->channel[cid].memsharerange.addr +
+				fl->apps->channel[cid].memsharerange.size);
+			} else {
+				VERIFY(err, map->phys >= me->range.addr &&
+				map->phys + map->size <=
+				me->range.addr + me->range.size);
+			}
 			if (err) {
 				pr_err("adsprpc: mmap fail out of range\n");
 				goto bail;
@@ -1848,12 +1876,22 @@ static int fastrpc_invoke_send(struct smq_invoke_ctx *ctx,
 {
 	struct smq_msg *msg = &ctx->msg;
 	struct fastrpc_file *fl = ctx->fl;
-	struct fastrpc_channel_ctx *channel_ctx = &fl->apps->channel[fl->cid];
-	int err = 0, len;
+	int err = 0, len, cid = -1;
+	struct fastrpc_channel_ctx *channel_ctx = NULL;
+
+	cid = fl->cid;
+	VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
+	if (err) {
+		err = -ECHRNG;
+		goto bail;
+	}
+	channel_ctx = &fl->apps->channel[fl->cid];
 
 	VERIFY(err, NULL != channel_ctx->chan);
-	if (err)
+	if (err) {
+		err = -ECHRNG;
 		goto bail;
+	}
 	msg->pid = fl->tgid;
 	msg->tid = current->pid;
 	if (fl->sessionid)
@@ -1972,11 +2010,22 @@ static int fastrpc_internal_invoke(struct fastrpc_file *fl, uint32_t mode,
 {
 	struct smq_invoke_ctx *ctx = NULL;
 	struct fastrpc_ioctl_invoke *invoke = &inv->inv;
-	int cid = fl->cid;
-	int interrupted = 0;
-	int err = 0;
+	int err = 0, cid = -1, interrupted = 0;
 	struct timespec invoket = {0};
-	int64_t *perf_counter = getperfcounter(fl, PERF_COUNT);
+	int64_t *perf_counter = NULL;
+
+	cid = fl->cid;
+	VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
+	if (err) {
+		err = -ECHRNG;
+		goto bail;
+	}
+	VERIFY(err, fl->sctx != NULL);
+	if (err) {
+		err = -EBADR;
+		goto bail;
+	}
+	perf_counter = getperfcounter(fl, PERF_COUNT);
 
 	if (fl->profile)
 		getnstimeofday(&invoket);
@@ -1989,13 +2038,6 @@ static int fastrpc_internal_invoke(struct fastrpc_file *fl, uint32_t mode,
 			goto bail;
 		}
 	}
-
-	VERIFY(err, fl->sctx != NULL);
-	if (err)
-		goto bail;
-	VERIFY(err, fl->cid >= 0 && fl->cid < NUM_CHANNELS);
-	if (err)
-		goto bail;
 
 	if (!kernel) {
 		VERIFY(err, 0 == context_restore_interrupted(fl, inv,
@@ -2369,6 +2411,9 @@ static int fastrpc_release_current_dsp_process(struct fastrpc_file *fl)
 	ioctl.crc = NULL;
 	VERIFY(err, 0 == (err = fastrpc_internal_invoke(fl,
 		FASTRPC_MODE_PARALLEL, 1, &ioctl)));
+	if (err)
+		pr_err("adsprpc: %s: releasing DSP process failed for %s, returned 0x%x",
+					__func__, current->comm, err);
 bail:
 	return err;
 }
@@ -2702,6 +2747,7 @@ static int fastrpc_internal_munmap_fd(struct fastrpc_file *fl,
 	VERIFY(err, (fl && ud));
 	if (err)
 		goto bail;
+	mutex_lock(&fl->map_mutex);
 	mutex_lock(&fl->fl_map_mutex);
 	if (fastrpc_mmap_find(fl, ud->fd, ud->va, ud->len, 0, 0, &map)) {
 		pr_err("adsprpc: mapping not found to unmap %d va %llx %x\n",
@@ -2709,11 +2755,13 @@ static int fastrpc_internal_munmap_fd(struct fastrpc_file *fl,
 			(unsigned int)ud->len);
 		err = -1;
 		mutex_unlock(&fl->fl_map_mutex);
+		mutex_unlock(&fl->map_mutex);
 		goto bail;
 	}
 	if (map)
 		fastrpc_mmap_free(map, 0);
 	mutex_unlock(&fl->fl_map_mutex);
+	mutex_unlock(&fl->map_mutex);
 bail:
 	return err;
 }
@@ -2815,6 +2863,7 @@ static int fastrpc_session_alloc_locked(struct fastrpc_channel_ctx *chan,
 {
 	struct fastrpc_apps *me = &gfa;
 	int idx = 0, err = 0;
+	int cid = 0;
 
 	if (chan->sesscount) {
 		for (idx = 0; idx < chan->sesscount; ++idx) {
@@ -2831,11 +2880,24 @@ static int fastrpc_session_alloc_locked(struct fastrpc_channel_ctx *chan,
 			goto bail;
 		chan->session[idx].smmu.faults = 0;
 	} else {
-		VERIFY(err, me->dev != NULL);
-		if (err)
-			goto bail;
-		chan->session[0].dev = me->dev;
-		chan->session[0].smmu.dev = me->dev;
+		cid = chan - &gcinfo[0];
+		if (cid == MDSP_DOMAIN_ID) {
+			VERIFY(err, me->mdev != NULL);
+			if (err) {
+				pr_info("ADSPRPC: mdsprpc-mem not initialized\n");
+				goto bail;
+			}
+			chan->session[0].dev = me->mdev;
+			chan->session[0].smmu.dev = me->mdev;
+		} else {
+			VERIFY(err, me->dev != NULL);
+			if (err) {
+				pr_info("ADSPRPC: adsprpc-mem not initialized\n");
+				goto bail;
+			}
+			chan->session[0].dev = me->dev;
+			chan->session[0].smmu.dev = me->dev;
+		}
 	}
 
 	*session = &chan->session[idx];
@@ -3383,7 +3445,7 @@ static const struct file_operations debugfs_fops = {
 static int fastrpc_channel_open(struct fastrpc_file *fl)
 {
 	struct fastrpc_apps *me = &gfa;
-	int cid, err = 0;
+	int cid = -1, err = 0;
 
 	mutex_lock(&me->smd_mutex);
 
@@ -3391,9 +3453,11 @@ static int fastrpc_channel_open(struct fastrpc_file *fl)
 	if (err)
 		goto bail;
 	cid = fl->cid;
-	VERIFY(err, cid >= 0 && cid < NUM_CHANNELS);
-	if (err)
+	VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
+	if (err) {
+		err = -ECHRNG;
 		goto bail;
+	}
 	if (me->channel[cid].ssrcount !=
 				 me->channel[cid].prevssrcount) {
 		if (!me->channel[cid].issubsystemup) {
@@ -3547,6 +3611,22 @@ static int fastrpc_get_info(struct fastrpc_file *fl, uint32_t *info)
 		}
 		fl->cid = cid;
 		fl->ssrcount = fl->apps->channel[cid].ssrcount;
+		if (fl->apps->channel[cid].memshareenabled == 1) {
+			int srcVM[1] = {VMID_HLOS};
+			int destVM[3] = {VMID_HLOS, VMID_MSS_MSA, VMID_ADSP_Q6};
+			int destVMperm[3] = {PERM_READ | PERM_WRITE | PERM_EXEC,
+				PERM_READ | PERM_WRITE | PERM_EXEC,
+				PERM_READ | PERM_WRITE | PERM_EXEC,
+				};
+
+			VERIFY(err, !hyp_assign_phys(
+				fl->apps->channel[cid].memsharerange.addr,
+				fl->apps->channel[cid].memsharerange.size,
+					srcVM, 1, destVM, destVMperm, 3));
+			if (err)
+				goto bail;
+			fl->apps->channel[cid].memshareenabled = 2;
+		}
 		VERIFY(err, !fastrpc_session_alloc_locked(
 			&fl->apps->channel[cid], 0, fl->sharedcb, &fl->sctx));
 		if (err)
@@ -3955,6 +4035,7 @@ static const struct of_device_id fastrpc_match_table[] = {
 	{ .compatible = "qcom,msm-fastrpc-legacy-compute", },
 	{ .compatible = "qcom,msm-fastrpc-legacy-compute-cb", },
 	{ .compatible = "qcom,msm-adsprpc-mem-region", },
+	{ .compatible = "qcom,msm-mdsprpc-mem-region", },
 	{}
 };
 
@@ -4165,6 +4246,7 @@ static int fastrpc_probe(struct platform_device *pdev)
 	int err = 0;
 	struct fastrpc_apps *me = &gfa;
 	struct device *dev = &pdev->dev;
+	struct smq_phy_page range;
 	struct device_node *ion_node, *node;
 	struct platform_device *ion_pdev;
 	struct cma *cma;
@@ -4247,6 +4329,39 @@ static int fastrpc_probe(struct platform_device *pdev)
 					destVM, destVMperm, 4));
 			if (err)
 				goto bail;
+		}
+		return 0;
+	}
+	if (of_device_is_compatible(dev->of_node,
+					"qcom,msm-mdsprpc-mem-region")) {
+		me->mdev = dev;
+		range.addr = 0;
+		range.size = 0;
+		ion_node = of_find_compatible_node(NULL, NULL, "qcom,msm-ion");
+		if (ion_node) {
+			for_each_available_child_of_node(ion_node, node) {
+				if (of_property_read_u32(node, "reg", &val))
+					continue;
+				if (val != ION_ADSP_HEAP_ID)
+					continue;
+				ion_pdev = of_find_device_by_node(node);
+				if (!ion_pdev)
+					break;
+				cma = dev_get_cma_area(&ion_pdev->dev);
+				if (cma) {
+					range.addr = cma_get_base(cma);
+					range.size = (size_t)cma_get_size(cma);
+				}
+				break;
+			}
+		}
+		if (range.addr && !of_property_read_bool(dev->of_node,
+							"restrict-access")) {
+			me->channel[MDSP_DOMAIN_ID].memshareenabled = 1;
+			me->channel[MDSP_DOMAIN_ID].memsharerange.addr =
+								range.addr;
+			me->channel[MDSP_DOMAIN_ID].memsharerange.size =
+								range.size;
 		}
 		return 0;
 	}
