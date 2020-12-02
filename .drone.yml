@@ -4,17 +4,10 @@ name: build
 
 steps:
 - name: cooked
-  image: najahi/oven:latest
+  image: kry9ton/image:latest
   environment:
-    BOT_API_KEY:
-      from_secret: BOT_API_KEY
-    DRONE_SERVER:
-      from_secret: DRONE_SERVER
-    DRONE_TOKEN:
-      from_secret: DRONE_TOKEN
-
+    token:
+      from_secret: bot_api
   commands:
-  - apt update
-  - apt install -y libssl-dev
-  - wget https://raw.githubusercontent.com/Blacksuan19/Scripts/master/dark_ages_ci.sh
-  - bash dark_ages_ci.sh vince
+  - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/kernel/CI/vince/drone49
+  - bash drone49
