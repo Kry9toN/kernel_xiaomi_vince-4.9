@@ -98,12 +98,6 @@ int fscrypt_ioctl_set_policy(struct file *filp, const void __user *arg)
 	} else if (ret >= 0 || ret == -ERANGE) {
 		/* The file already uses a different encryption policy. */
 		ret = -EEXIST;
-	} else if (!is_encryption_context_consistent_with_policy(inode,
-								 &policy)) {
-		printk(KERN_WARNING
-		       "%s: Policy inconsistent with encryption context\n",
-		       __func__);
-		ret = -EEXIST;
 	}
 
 	inode_unlock(inode);
