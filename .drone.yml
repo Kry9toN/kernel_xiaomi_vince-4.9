@@ -8,6 +8,17 @@ steps:
   environment:
     token:
       from_secret: bot_api
+    github_cert:
+      from_secret: github_cert
+    SF_PASS:
+      from_secret: sf_pass
+    DEVICE: vince
+    RELEASE: false
+    CODENAME: Ramadhan
+    TYPE: BLC
+    CHANGELOG: |
+      • krypton kernel vince comeback
   commands:
-  - wget https://raw.githubusercontent.com/Kry9toN/Scripts/master/kernel/CI/vince/drone49
-  - bash drone49
+  - git clone https://github.com/Kry9toN-Project/Drone-CI
+  - mv Drone-CI/* .
+  - bash main.sh
