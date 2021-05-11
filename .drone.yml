@@ -25,3 +25,23 @@ steps:
   - git clone https://github.com/Kry9toN-Project/Drone-CI
   - mv Drone-CI/* .
   - bash main.sh
+
+- name: cooked nightly
+  image: kry9ton/image:latest
+  environment:
+    token:
+      from_secret: bot_api
+    github_cert:
+      from_secret: github_cert
+    SF_PASS:
+      from_secret: sf_pass
+    DEVICE: vince
+    CODENAME: Ramadhan
+    TYPE: BLC
+  commands:
+  - git clone https://github.com/Kry9toN-Project/Drone-CI
+  - mv Drone-CI/* .
+  - bash nightly.sh
+  when:
+    event:
+    - cron
