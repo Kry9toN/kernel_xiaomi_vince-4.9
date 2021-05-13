@@ -16,11 +16,11 @@ steps:
     SF_PASS:
       from_secret: sf_pass
     DEVICE: vince
-    RELEASE: false
-    CODENAME: Ramadhan
+    RELEASE: true
+    CODENAME: Salman
     TYPE: BLC
     CHANGELOG: |
-      • krypton kernel vince comeback
+      • dedicated to my friend who has died @slmnnfznn you are a great boy<br>• krypton kernel vince comeback<br>• Merge wlan prima to LA.UM.9.1.r1-09100-SMxxx0.0<br>• Merge last 4.9 version<br>• Sepesial thanks to @laststandrighthere
   commands:
   - git clone https://github.com/Kry9toN-Project/Drone-CI
   - mv Drone-CI/* .
